@@ -583,7 +583,7 @@ export default function DashboardClient({
                 <FunnelStep
                   label="1. Novos Cadastros (Chegaram)"
                   count={metrics.total}
-                  percent={100}
+                  percent={metrics.total > 0 ? 100 : 0}
                   color="#2563eb"
                   badge={`${metrics.novos} novos`}
                 />
