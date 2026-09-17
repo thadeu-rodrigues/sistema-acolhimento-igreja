@@ -1,28 +1,40 @@
-﻿# ---- deps ----
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+FROM node:20-bookworm-slim AS base
+
+# Install OpenSSL and certificates for Prisma
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+
+# Stage 1: Install dependencies
+FROM base AS deps
 COPY package.json package-lock.json ./
+COPY prisma ./prisma/
 RUN npm ci
 
-# ---- builder ----
-FROM node:20-alpine AS builder
+# Stage 2: Build the Next.js application
+FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ---- runner ----
-FROM node:20-alpine AS runner
+# Stage 3: Production runner
+FROM base AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-USER nextjs
-EXPOSE 3000
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
-CMD [`"node", "server.js"]
+ENV HOSTNAME="0.0.0.0"
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma ./prisma
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
