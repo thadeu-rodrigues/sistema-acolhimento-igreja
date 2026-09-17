@@ -1,0 +1,174 @@
+// ============================================================
+// prisma/schema.prisma — SQLite (desenvolvimento local)
+// Para produção (Coolify/PostgreSQL): trocar provider e DATABASE_URL
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────
+// MODELS
+// Nota: SQLite não suporta enums nativos nem arrays.
+// Enums são armazenados como String com validação na app.
+// Arrays (decisions) armazenados como JSON string.
+// ──────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String?  @map("password_hash")
+  // role: ADMIN | MASTER | LEADER
+  role         String   @default("LEADER")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  leaderGroups     LeaderGroup[]
+  assignedVisitors Visitor[]     @relation("AssignedLeader")
+  notes            Note[]
+  auditLogs        AuditLog[]
+  accounts         Account[]
+  sessions         Session[]
+
+  @@map("users")
+}
+
+model Group {
+  id               String   @id @default(cuid())
+  // name: VOLTZ | BOLD | BURN | A3
+  name             String   @unique
+  description      String?
+  whatsappTemplate String?  @map("whatsapp_template")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  leaders  LeaderGroup[]
+  visitors Visitor[]
+
+  @@map("groups")
+}
+
+model LeaderGroup {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  groupId         String   @map("group_id")
+  isPrimary       Boolean  @default(true) @map("is_primary")
+  roundRobinIndex Int      @default(0) @map("round_robin_index")
+  assignedAt      DateTime @default(now()) @map("assigned_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("leader_groups")
+}
+
+model Visitor {
+  id               String    @id @default(cuid())
+  fullName         String    @map("full_name")
+  phone            String
+  neighborhood     String
+  city             String
+  // maritalStatus: SOLTEIRO | CASADO | NOIVO | DIVORCIADO | VIUVO
+  maritalStatus    String    @map("marital_status")
+  birthDate        DateTime  @map("birth_date")
+  calculatedAge    Int       @map("calculated_age")
+  // visitReason: PRIMEIRA_VEZ | DECISAO
+  visitReason      String    @map("visit_reason")
+  // decisions: JSON array string ex: ["ACEITAR_JESUS","BATISMO"]
+  decisions        String?   @default("[]")
+  groupId          String    @map("group_id")
+  assignedLeaderId String?   @map("assigned_leader_id")
+  // status: NOVO | EM_CONTATO | INTEGRADO | SEM_RESPOSTA | ARQUIVADO
+  status           String    @default("NOVO")
+  visitedAt        DateTime  @default(now()) @map("visited_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  group          Group  @relation(fields: [groupId], references: [id])
+  assignedLeader User?  @relation("AssignedLeader", fields: [assignedLeaderId], references: [id])
+  notes          Note[]
+
+  @@map("visitors")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  visitorId String   @map("visitor_id")
+  authorId  String   @map("author_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  visitor Visitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@map("notes")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  // payload armazenado como JSON string
+  payload    String?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+// ──────────────────────────────────────────
+// AUTH.JS v5 — Tabelas obrigatórias
+// ──────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}

@@ -1,0 +1,22 @@
+{
+  "name": "IC Taubaté — Acolhimento",
+  "short_name": "IC Taubaté",
+  "description": "Sistema de acolhimento de visitantes da Igreja da Cidade Taubaté",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#E8351A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
