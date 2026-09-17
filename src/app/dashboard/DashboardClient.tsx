@@ -2163,7 +2163,7 @@ function UserForm({
 
       <div className="dash-form-grid">
         {field("Nome Completo", <input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} placeholder="Nome" />)}
-        {field("E-mail", <input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="email@exemplo.com" />)}
+        {field("Usuário / E-mail", <input id="edit-email" type="text" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="ex: admin, voltz ou email" />)}
         {field("Telefone", <input id="edit-phone" value={phone} maxLength={15} onChange={(e) => {
           const f = formatPhoneInput(e.target.value);
           setPhone(f);

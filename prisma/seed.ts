@@ -44,58 +44,70 @@ async function main() {
   }
   console.log("✅ Grupos criados:", groups.map((g) => g.name).join(", "));
 
+  // Senha padrão inicial para todos os usuários
+  const defaultPassword = await bcrypt.hash("adminictaubate123@", 12);
+
   // ── 2. Criar Usuário Admin Padrão ────────────────────────
-  const adminEmail = "admin@ictaubate.com.br";
-  const adminPassword = await bcrypt.hash("admin123", 12);
+  const adminUser = "admin";
 
   await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
+    where: { email: adminUser },
+    update: {
+      passwordHash: defaultPassword,
+      role: "ADMIN",
+      active: true,
+    },
     create: {
       name: "Administrador",
-      email: adminEmail,
-      passwordHash: adminPassword,
+      email: adminUser,
+      passwordHash: defaultPassword,
       role: "ADMIN",
       active: true,
     },
   });
-  console.log(`✅ Admin: ${adminEmail} / admin123`);
+  console.log(`✅ Admin: ${adminUser} / adminictaubate123@`);
 
   // ── 3. Criar Usuário Master de Exemplo ──────────────────
-  const masterEmail = "master@ictaubate.com.br";
-  const masterPassword = await bcrypt.hash("admin123", 12);
+  const masterUser = "master";
 
   await prisma.user.upsert({
-    where: { email: masterEmail },
-    update: {},
+    where: { email: masterUser },
+    update: {
+      passwordHash: defaultPassword,
+      role: "MASTER",
+      active: true,
+    },
     create: {
       name: "Coordenação Ministerial",
-      email: masterEmail,
-      passwordHash: masterPassword,
+      email: masterUser,
+      passwordHash: defaultPassword,
       role: "MASTER",
       active: true,
     },
   });
-  console.log(`✅ Master: ${masterEmail} / admin123`);
+  console.log(`✅ Master: ${masterUser} / adminictaubate123@`);
 
   // ── 4. Criar Líderes de Exemplo ──────────────────────────
   const leaders = [
-    { name: "Líder Voltz",  email: "voltz@ictaubate.com.br",  group: "VOLTZ" },
-    { name: "Líder Bold",   email: "bold@ictaubate.com.br",   group: "BOLD"  },
-    { name: "Líder Burn",   email: "burn@ictaubate.com.br",   group: "BURN"  },
-    { name: "Líder A3",     email: "a3@ictaubate.com.br",     group: "A3"    },
+    { name: "Líder Voltz",  username: "voltz",  group: "VOLTZ" },
+    { name: "Líder Bold",   username: "bold",   group: "BOLD"  },
+    { name: "Líder Burn",   username: "burn",   group: "BURN"  },
+    { name: "Líder A3",     username: "a3",     group: "A3"    },
   ];
-
-  const leaderPassword = await bcrypt.hash("admin123", 12);
 
   for (const l of leaders) {
     const user = await prisma.user.upsert({
-      where: { email: l.email },
-      update: {},
+      where: { email: l.username },
+      update: {
+        name: l.name,
+        passwordHash: defaultPassword,
+        role: "LEADER",
+        active: true,
+      },
       create: {
         name: l.name,
-        email: l.email,
-        passwordHash: leaderPassword,
+        email: l.username,
+        passwordHash: defaultPassword,
         role: "LEADER",
         active: true,
       },
@@ -109,6 +121,7 @@ async function main() {
         create: { userId: user.id, groupId: group.id, isPrimary: true },
       });
     }
+    console.log(`✅ Líder: ${l.username} (${l.group}) / adminictaubate123@`);
   }
   // ── 5. Criar Visitantes de Exemplo para Teste ───────────
   const sampleVisitors = [

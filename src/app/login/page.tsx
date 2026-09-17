@@ -67,13 +67,14 @@ export default function LoginPage() {
           )}
 
           <div className="form-group">
-            <label className="form-label" htmlFor="email">E-mail</label>
+            <label className="form-label" htmlFor="email">Usuário</label>
             <input
               id="email"
               name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="seu@email.com.br"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              placeholder="admin, master ou líder"
               className="form-input"
               required
             />

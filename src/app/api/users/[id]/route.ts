@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const updateSchema = z.object({
   name:     z.string().min(2).optional(),
-  email:    z.string().email().optional(),
+  email:    z.string().min(1).transform((v) => v.trim().toLowerCase()).optional(),
   phone:    z.string().optional().nullable(),
   role:     z.enum(["ADMIN", "MASTER", "LEADER"]).optional(),
   active:   z.boolean().optional(),

@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: z.string().min(1).transform((v) => v.trim().toLowerCase()),
   phone: z.string().optional(),
   password: z.string().min(6),
   role: z.enum(["ADMIN", "MASTER", "LEADER"]),

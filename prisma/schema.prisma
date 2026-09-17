@@ -1,6 +1,5 @@
 // ============================================================
-// prisma/schema.prisma — SQLite (desenvolvimento local)
-// Para produção (Coolify/PostgreSQL): trocar provider e DATABASE_URL
+// prisma/schema.prisma — PostgreSQL (Produção / Coolify)
 // ============================================================
 
 generator client {
@@ -8,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
