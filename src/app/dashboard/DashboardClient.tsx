@@ -260,6 +260,23 @@ export default function DashboardClient({
     );
   };
 
+  const handleDeleteVisitor = async (id: string, name: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o cadastro de "${name}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/visitors/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Erro ao excluir visitante.");
+        return;
+      }
+      setVisitors((prev) => prev.filter((v) => v.id !== id));
+      if (expandedRowId === id) setExpandedRowId(null);
+    } catch {
+      alert("Erro de conexão ao excluir visitante.");
+    }
+  };
+
   const refreshUsers = useCallback(async () => {
     const res = await fetch("/api/users");
     if (res.ok) setUsers(await res.json());
@@ -901,6 +918,7 @@ export default function DashboardClient({
                     visitor={v}
                     role={role}
                     onStatusChange={handleVisitorStatusChange}
+                    onDelete={handleDeleteVisitor}
                   />
                 ))}
               </div>
@@ -1041,6 +1059,24 @@ export default function DashboardClient({
                                   >
                                     WhatsApp
                                   </a>
+                                  <button
+                                    id={`table-del-${v.id}`}
+                                    type="button"
+                                    onClick={() => handleDeleteVisitor(v.id, v.fullName)}
+                                    title="Excluir cadastro"
+                                    style={{
+                                      background: "#fff1f0",
+                                      color: "#E8351A",
+                                      border: "1px solid #fecaca",
+                                      padding: "0.32rem 0.55rem",
+                                      borderRadius: "999px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    🗑️ Excluir
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1061,7 +1097,7 @@ export default function DashboardClient({
                                         ✕ Fechar
                                       </button>
                                     </div>
-                                    <VisitorDossier visitor={v} role={role} onStatusChange={handleVisitorStatusChange} />
+                                    <VisitorDossier visitor={v} role={role} onStatusChange={handleVisitorStatusChange} onDelete={handleDeleteVisitor} />
                                   </div>
                                 </td>
                               </tr>
@@ -2284,10 +2320,12 @@ function VisitorDossier({
   visitor: v,
   role,
   onStatusChange,
+  onDelete,
 }: {
   visitor: Visitor;
   role: string;
   onStatusChange: (id: string, newStatus: string) => void;
+  onDelete?: (id: string, name: string) => void;
 }) {
   const [updating, setUpdating] = useState(false);
   const decisions = (() => {
@@ -2452,6 +2490,32 @@ function VisitorDossier({
         >
           💬 Chamar no WhatsApp com Mensagem Personalizada
         </a>
+        {onDelete && (
+          <button
+            id={`dossier-del-${v.id}`}
+            type="button"
+            onClick={() => onDelete(v.id, v.fullName)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.4rem",
+              background: "#fff1f0",
+              color: "#E8351A",
+              border: "1.5px solid #fecaca",
+              padding: "0.55rem 1.15rem",
+              borderRadius: "999px",
+              fontSize: "0.8rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              width: "100%",
+              boxSizing: "border-box",
+              marginTop: "0.5rem",
+            }}
+          >
+            🗑️ Excluir este cadastro
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2462,10 +2526,12 @@ function VisitorCard({
   visitor: v,
   role,
   onStatusChange,
+  onDelete,
 }: {
   visitor: Visitor;
   role: string;
   onStatusChange: (id: string, newStatus: string) => void;
+  onDelete?: (id: string, name: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const status = STATUS_LABELS[v.status] ?? { label: v.status, color: "#9ca3af", bg: "#f3f4f6" };
@@ -2541,7 +2607,7 @@ function VisitorCard({
 
       {expanded && (
         <div style={{ borderTop: "1px solid #f0f0f0" }}>
-          <VisitorDossier visitor={v} role={role} onStatusChange={onStatusChange} />
+          <VisitorDossier visitor={v} role={role} onStatusChange={onStatusChange} onDelete={onDelete} />
         </div>
       )}
     </div>

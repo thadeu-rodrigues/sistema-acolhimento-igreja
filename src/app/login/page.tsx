@@ -74,7 +74,7 @@ export default function LoginPage() {
               type="text"
               autoComplete="username"
               autoCapitalize="none"
-              placeholder="admin, master ou líder"
+              placeholder="Digite seu usuário"
               className="form-input"
               required
             />

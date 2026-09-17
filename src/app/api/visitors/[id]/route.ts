@@ -65,3 +65,43 @@ export async function PATCH(
 
   return NextResponse.json(updatedVisitor);
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const userRole = (session.user as any).role as string;
+  const userId = session.user.id as string;
+
+  if (userRole === "LEADER") {
+    const leaderGroups = await prisma.leaderGroup.findMany({
+      where: { userId },
+      select: { groupId: true },
+    });
+    const groupIds = leaderGroups.map((lg) => lg.groupId);
+
+    const visitor = await prisma.visitor.findUnique({
+      where: { id },
+      select: { groupId: true },
+    });
+
+    if (!visitor || !groupIds.includes(visitor.groupId)) {
+      return NextResponse.json(
+        { error: "Acesso negado a este visitante" },
+        { status: 403 }
+      );
+    }
+  }
+
+  await prisma.visitor.delete({
+    where: { id },
+  });
+
+  return NextResponse.json({ success: true });
+}

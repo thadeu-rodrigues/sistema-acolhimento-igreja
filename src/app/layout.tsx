@@ -2,18 +2,35 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://ictaubate.online"),
   title: "Bem-vindo | Igreja da Cidade Taubaté",
   description:
-    "Preencha o formulário de visitante e nossa equipe de acolhimento entrará em contato com você.",
+    "Que alegria ter você conosco! Uma igreja família para pertencer. Preencha seus dados para receber nosso contato.",
   icons: {
     icon: "/logo-ic.png",
     apple: "/logo-ic.png",
   },
   openGraph: {
-    title: "Bem-vindo | Igreja da Cidade Taubaté",
-    description: "Uma igreja em muitos lugares. Preencha o formulário e faça parte da família IC.",
+    title: "Bem-vindo à Igreja da Cidade Taubaté",
+    description: "Uma família para pertencer. Que alegria ter você conosco em nosso culto! Toque para preencher seu contato.",
+    url: "https://ictaubate.online",
+    siteName: "Igreja da Cidade Taubaté",
     locale: "pt_BR",
     type: "website",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 675,
+        alt: "Igreja da Cidade Taubaté - Bem-vindo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bem-vindo à Igreja da Cidade Taubaté",
+    description: "Uma família para pertencer. Que alegria ter você conosco em nosso culto!",
+    images: ["/og-image.jpg"],
   },
 };
 
