@@ -195,7 +195,25 @@ export default function VisitorForm() {
             )}
           </div>
 
-          {/* ── Telefone / WhatsApp ── */}
+          {/* ── Data de Nascimento ── */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="birthDate">
+              Data de Nascimento
+            </label>
+            <input
+              id="birthDate"
+              name="birthDate"
+              type="date"
+              max={new Date().toISOString().split("T")[0]}
+              className={`form-input ${state.errors?.birthDate ? "error" : ""}`}
+              required
+              style={{ colorScheme: "light" }}
+            />
+            {state.errors?.birthDate && (
+              <span className="form-error">⚠ {state.errors.birthDate[0]}</span>
+            )}
+          </div>
+
           <div className="form-group">
             <label className="form-label" htmlFor="phone">
               WhatsApp
@@ -346,24 +364,6 @@ export default function VisitorForm() {
             )}
           </div>
 
-          {/* ── Data de Nascimento ── */}
-          <div className="form-group">
-            <label className="form-label" htmlFor="birthDate">
-              Data de Nascimento
-            </label>
-            <input
-              id="birthDate"
-              name="birthDate"
-              type="date"
-              max={new Date().toISOString().split("T")[0]}
-              className={`form-input ${state.errors?.birthDate ? "error" : ""}`}
-              required
-              style={{ colorScheme: "light" }}
-            />
-            {state.errors?.birthDate && (
-              <span className="form-error">⚠ {state.errors.birthDate[0]}</span>
-            )}
-          </div>
 
           <div className="divider" />
 
