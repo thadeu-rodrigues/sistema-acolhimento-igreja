@@ -2267,6 +2267,8 @@ function UserCard({
   const roleInfo = ROLE_BADGES[user.role] || { label: user.role, color: "#fff", bg: "#6b7280" };
   const isLeader = user.role === "LEADER";
 
+  const [unlinkingTelegram, setUnlinkingTelegram] = useState(false);
+
   async function handleGenerateTelegramLink() {
     setTelegramLinkLoading(true);
     setTelegramLink(null);
@@ -2282,6 +2284,25 @@ function UserCard({
       alert("Erro ao gerar link Telegram.");
     } finally {
       setTelegramLinkLoading(false);
+    }
+  }
+
+  async function handleUnlinkTelegram() {
+    if (!confirm(`Deseja desvincular o Telegram de ${user.name}? O usuário não receberá mais notificações no bot.`)) return;
+    setUnlinkingTelegram(true);
+    try {
+      const res = await fetch("/api/telegram/unlink", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      if (!res.ok) throw new Error();
+      setTelegramLink(null);
+      await onSaved();
+    } catch {
+      alert("Erro ao desvincular Telegram.");
+    } finally {
+      setUnlinkingTelegram(false);
     }
   }
 
@@ -2364,30 +2385,57 @@ function UserCard({
           {roleInfo.label}
         </span>
 
-        {/* Botão Telegram (apenas para líderes) */}
+        {/* Botões Telegram (apenas para líderes) */}
         {isLeader && (
-          <button
-            id={`telegram-btn-${user.id}`}
-            onClick={handleGenerateTelegramLink}
-            disabled={telegramLinkLoading}
-            title={user.telegramChatId ? "Telegram conectado — gerar novo link" : "Conectar Telegram"}
-            style={{
-              background: user.telegramChatId ? "#e7f7ee" : "#f0f9ff",
-              border: `1px solid ${user.telegramChatId ? "#bbf7d0" : "#bae6fd"}`,
-              borderRadius: "6px",
-              padding: "0.3rem 0.6rem",
-              fontSize: "0.72rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              color: user.telegramChatId ? "#15803d" : "#0369a1",
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: "0.25rem",
-            }}
-          >
-            {user.telegramChatId ? "🟢 Telegram" : "🔴 Conectar Telegram"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <button
+              id={`telegram-btn-${user.id}`}
+              onClick={handleGenerateTelegramLink}
+              disabled={telegramLinkLoading}
+              title={user.telegramChatId ? "Telegram conectado — gerar novo link para trocar de conta" : "Conectar Telegram"}
+              style={{
+                background: user.telegramChatId ? "#e7f7ee" : "#f0f9ff",
+                border: `1px solid ${user.telegramChatId ? "#bbf7d0" : "#bae6fd"}`,
+                borderRadius: "6px",
+                padding: "0.3rem 0.6rem",
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                color: user.telegramChatId ? "#15803d" : "#0369a1",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.25rem",
+              }}
+            >
+              {user.telegramChatId ? "🟢 Conectado" : "🔴 Conectar Telegram"}
+            </button>
+
+            {user.telegramChatId && (
+              <button
+                id={`telegram-unlink-${user.id}`}
+                onClick={handleUnlinkTelegram}
+                disabled={unlinkingTelegram}
+                title="Desvincular Telegram deste líder"
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "6px",
+                  padding: "0.3rem 0.5rem",
+                  fontSize: "0.72rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  color: "#dc2626",
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.2rem",
+                }}
+              >
+                {unlinkingTelegram ? "..." : "✕ Desvincular"}
+              </button>
+            )}
+          </div>
         )}
 
         <button
