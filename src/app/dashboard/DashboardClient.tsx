@@ -55,6 +55,7 @@ type User = {
   phone?: string | null;
   role: string;
   active: boolean;
+  telegramChatId?: string | null;
   leaderGroups?: UserGroup[];
 };
 
@@ -2258,9 +2259,38 @@ function UserCard({
   onSaved: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [telegramLink, setTelegramLink] = useState<string | null>(null);
+  const [telegramLinkLoading, setTelegramLinkLoading] = useState(false);
+  const [telegramCopied, setTelegramCopied] = useState(false);
   const isSelf = user.id === currentUserId;
   const userGroupIds = user.leaderGroups?.map((lg) => lg.groupId) ?? [];
   const roleInfo = ROLE_BADGES[user.role] || { label: user.role, color: "#fff", bg: "#6b7280" };
+  const isLeader = user.role === "LEADER";
+
+  async function handleGenerateTelegramLink() {
+    setTelegramLinkLoading(true);
+    setTelegramLink(null);
+    try {
+      const res = await fetch("/api/telegram/generate-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      if (data.link) setTelegramLink(data.link);
+    } catch {
+      alert("Erro ao gerar link Telegram.");
+    } finally {
+      setTelegramLinkLoading(false);
+    }
+  }
+
+  async function copyTelegramLink() {
+    if (!telegramLink) return;
+    await navigator.clipboard.writeText(telegramLink);
+    setTelegramCopied(true);
+    setTimeout(() => setTelegramCopied(false), 2000);
+  }
 
   return (
     <div style={{
@@ -2334,6 +2364,32 @@ function UserCard({
           {roleInfo.label}
         </span>
 
+        {/* Botão Telegram (apenas para líderes) */}
+        {isLeader && (
+          <button
+            id={`telegram-btn-${user.id}`}
+            onClick={handleGenerateTelegramLink}
+            disabled={telegramLinkLoading}
+            title={user.telegramChatId ? "Telegram conectado — gerar novo link" : "Conectar Telegram"}
+            style={{
+              background: user.telegramChatId ? "#e7f7ee" : "#f0f9ff",
+              border: `1px solid ${user.telegramChatId ? "#bbf7d0" : "#bae6fd"}`,
+              borderRadius: "6px",
+              padding: "0.3rem 0.6rem",
+              fontSize: "0.72rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              color: user.telegramChatId ? "#15803d" : "#0369a1",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+            }}
+          >
+            {user.telegramChatId ? "🟢 Telegram" : "🔴 Conectar Telegram"}
+          </button>
+        )}
+
         <button
           id={`edit-user-${user.id}`}
           onClick={() => setEditing(!editing)}
@@ -2352,6 +2408,52 @@ function UserCard({
           {editing ? "Fechar" : "Editar"}
         </button>
       </div>
+
+      {/* Painel do link Telegram gerado */}
+      {telegramLink && (
+        <div style={{
+          borderTop: "1px solid #e0f2fe",
+          background: "#f0f9ff",
+          padding: "0.75rem 1rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.4rem",
+        }}>
+          <p style={{ fontSize: "0.72rem", color: "#0369a1", margin: 0, fontWeight: 600 }}>
+            📤 Envie este link para <strong>{user.name}</strong> abrir no Telegram (válido por 30 min):
+          </p>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <code style={{
+              flex: 1,
+              background: "white",
+              border: "1px solid #bae6fd",
+              borderRadius: "6px",
+              padding: "0.3rem 0.6rem",
+              fontSize: "0.7rem",
+              color: "#0c4a6e",
+              wordBreak: "break-all",
+            }}>
+              {telegramLink}
+            </code>
+            <button
+              onClick={copyTelegramLink}
+              style={{
+                background: telegramCopied ? "#16a34a" : "#0284c7",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                padding: "0.3rem 0.75rem",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              {telegramCopied ? "✅ Copiado!" : "Copiar"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div style={{ borderTop: "1px solid #f0f0f0" }}>

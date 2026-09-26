@@ -94,13 +94,22 @@ export async function submitVisitor(
 
     const group = await prisma.group.findUnique({
       where: { name: routing.group },
+      include: {
+        leaders: {
+          include: {
+            user: {
+              select: { name: true, telegramChatId: true },
+            },
+          },
+        },
+      },
     });
 
     if (!group) {
       throw new Error(`Grupo ${routing.group} não encontrado.`);
     }
 
-    await prisma.visitor.create({
+    const createdVisitor = await prisma.visitor.create({
       data: {
         fullName: data.fullName,
         phone: data.phone,
@@ -117,6 +126,24 @@ export async function submitVisitor(
         status: "NOVO",
       },
     });
+
+    // Notifica líderes via Telegram (fire-and-forget — não bloqueia o redirect)
+    if (group.leaders.length > 0) {
+      const { notifyLeaders } = await import("@/lib/telegram");
+      notifyLeaders(
+        {
+          id: createdVisitor.id,
+          fullName: data.fullName,
+          phone: data.phone,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          visitReason: data.visitReason,
+          decisions: JSON.stringify(data.decisions || []),
+        },
+        group.leaders
+      ).catch(console.error);
+    }
+
 
     console.log("[submitVisitor] Novo visitante salvo:", {
       ...data,
