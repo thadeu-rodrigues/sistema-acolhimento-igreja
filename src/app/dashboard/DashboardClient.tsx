@@ -329,6 +329,7 @@ export default function DashboardClient({
   }, [isMasterOrAdmin, activeTab]);
 
   const [showNewUser, setShowNewUser] = useState(false);
+  const [showTelegramHelp, setShowTelegramHelp] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
@@ -1453,32 +1454,149 @@ export default function DashboardClient({
                   Gestão de Acessos & Usuários
                 </h2>
                 <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "2px 0 0 0" }}>
-                  Controle de usuários, senhas e redes vinculadas.
+                  Controle de usuários, senhas, redes vinculadas e alertas no Telegram.
                 </p>
               </div>
 
-              <button
-                id="new-user-btn"
-                onClick={() => setShowNewUser(true)}
-                className="dash-mobile-full"
-                style={{
-                  background: "#E8351A",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "999px",
-                  padding: "0.5rem 1.15rem",
-                  fontWeight: 600,
-                  fontSize: "0.8rem",
-                  cursor: "pointer",
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button
+                  id="telegram-help-btn"
+                  onClick={() => setShowTelegramHelp(!showTelegramHelp)}
+                  style={{
+                    background: showTelegramHelp ? "#0284c7" : "#f0f9ff",
+                    color: showTelegramHelp ? "white" : "#0369a1",
+                    border: "1px solid #bae6fd",
+                    borderRadius: "999px",
+                    padding: "0.5rem 1rem",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                  }}
+                >
+                  {showTelegramHelp ? "✕ Fechar Ajuda" : "✈️ Como Conectar o Telegram?"}
+                </button>
+
+                <button
+                  id="new-user-btn"
+                  onClick={() => setShowNewUser(true)}
+                  className="dash-mobile-full"
+                  style={{
+                    background: "#E8351A",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "999px",
+                    padding: "0.5rem 1.15rem",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.3rem",
+                  }}
+                >
+                  + Novo Usuário
+                </button>
+              </div>
+            </div>
+
+            {/* Painel de Ajuda / Passo a Passo do Telegram */}
+            {showTelegramHelp && (
+              <div style={{
+                background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                border: "1px solid #bae6fd",
+                borderRadius: "12px",
+                padding: "1.25rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.85rem",
+                boxShadow: "0 2px 6px rgba(3, 105, 161, 0.08)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ fontSize: "1.4rem" }}>🤖</span>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#0369a1" }}>
+                        Passo a Passo: Como Conectar o Telegram do Líder
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "0.72rem", color: "#0284c7" }}>
+                        Siga os passos abaixo para que os líderes recebam notificações instantâneas de visitantes.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowTelegramHelp(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#0369a1",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "0.75rem" }}>
+                  <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #e0f2fe" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a", marginBottom: "0.3rem" }}>
+                      1️⃣ Cadastrar/Editar Líder
+                    </div>
+                    <p style={{ fontSize: "0.72rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                      Certifique-se de que o usuário tem o perfil <strong>Líder de Rede</strong> e que suas <strong>Redes vinculadas</strong> estão marcadas.
+                    </p>
+                  </div>
+
+                  <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #e0f2fe" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a", marginBottom: "0.3rem" }}>
+                      2️⃣ Gerar o Link de Acesso
+                    </div>
+                    <p style={{ fontSize: "0.72rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                      No card do usuário abaixo, clique em <strong style={{ color: "#0369a1" }}>🔴 Conectar Telegram</strong> para gerar o link individual e seguro.
+                    </p>
+                  </div>
+
+                  <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #e0f2fe" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a", marginBottom: "0.3rem" }}>
+                      3️⃣ Enviar para o Líder
+                    </div>
+                    <p style={{ fontSize: "0.72rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                      Clique em <strong>Copiar Link</strong> e envie pelo WhatsApp pessoal do líder. O link é de uso único e expira em 30 minutos.
+                    </p>
+                  </div>
+
+                  <div style={{ background: "white", padding: "0.85rem", borderRadius: "8px", border: "1px solid #e0f2fe" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a", marginBottom: "0.3rem" }}>
+                      4️⃣ Líder ativa no Telegram
+                    </div>
+                    <p style={{ fontSize: "0.72rem", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                      O líder toca no link, o Telegram abre o bot <strong>@ictaubate_bot</strong> e ele toca em <strong>Iniciar / Começar</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: "#e0f2fe",
+                  borderRadius: "6px",
+                  padding: "0.6rem 0.8rem",
+                  fontSize: "0.72rem",
+                  color: "#0369a1",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.3rem",
-                }}
-              >
-                + Novo Usuário
-              </button>
-            </div>
+                  gap: "0.5rem",
+                }}>
+                  <span>💡</span>
+                  <span>
+                    <strong>Resultado:</strong> O card mudará para <strong>🟢 Conectado</strong>. Assim que um visitante preencher a ficha daquela rede, o líder recebe o alerta com o botão direto para o WhatsApp!
+                  </span>
+                </div>
+              </div>
+            )}
 
             {showNewUser && (
               <UserForm
