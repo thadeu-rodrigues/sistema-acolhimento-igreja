@@ -72,6 +72,7 @@ export default function VisitorForm() {
 
   // Estado local dos campos interativos
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [marital, setMarital] = useState<MaritalStatus | "">("");
   const [hasChildren, setHasChildren] = useState<boolean | null>(null);
   const [childrenCount, setChildrenCount] = useState<string>("");
@@ -205,6 +206,8 @@ export default function VisitorForm() {
               name="birthDate"
               type="date"
               max={new Date().toISOString().split("T")[0]}
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
               className={`form-input ${state.errors?.birthDate ? "error" : ""}`}
               required
               style={{ colorScheme: "light" }}
