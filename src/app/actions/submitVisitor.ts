@@ -14,10 +14,16 @@ const visitorSchema = z.object({
   neighborhood: z.string().min(2, "Informe o bairro ou cidade"),
   city: z.string().min(2, "Informe a cidade"),
   maritalStatus: z.enum(["SOLTEIRO", "CASADO", "NOIVO", "DIVORCIADO", "VIUVO"]),
+  hasChildren: z.preprocess((val) => val === "true" || val === true || val === "SIM", z.boolean()).default(false),
+  childrenCount: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  }, z.number().min(0)).default(0),
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
-  visitReason: z.enum(["PRIMEIRA_VEZ", "DECISAO"]),
+  visitReason: z.enum(["QUERO_GDC", "PRIMEIRA_VEZ", "EVANGELISMO", "DECISAO"]),
   decisions: z
     .array(z.enum(["ACEITAR_JESUS", "RECONCILIACAO", "BATISMO", "EVANGELISMO"]))
     .optional(),
@@ -49,6 +55,8 @@ export async function submitVisitor(
     neighborhood: formData.get("neighborhood"),
     city: formData.get("city"),
     maritalStatus: formData.get("maritalStatus"),
+    hasChildren: formData.get("hasChildren"),
+    childrenCount: formData.get("childrenCount"),
     birthDate: formData.get("birthDate"),
     visitReason: formData.get("visitReason"),
     decisions: formData.getAll("decisions"),
@@ -74,6 +82,8 @@ export async function submitVisitor(
     neighborhood: data.neighborhood,
     city: data.city,
     maritalStatus: data.maritalStatus,
+    hasChildren: data.hasChildren,
+    childrenCount: data.childrenCount,
     birthDate: data.birthDate,
     visitReason: data.visitReason,
     decisions: data.decisions as any,
@@ -97,6 +107,8 @@ export async function submitVisitor(
         neighborhood: data.neighborhood,
         city: data.city,
         maritalStatus: data.maritalStatus,
+        hasChildren: data.hasChildren,
+        childrenCount: data.hasChildren ? Math.max(1, data.childrenCount) : 0,
         birthDate: new Date(data.birthDate),
         calculatedAge: routing.calculatedAge,
         visitReason: data.visitReason,

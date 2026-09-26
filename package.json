@@ -16,6 +16,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@prisma/client": "^5.22.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",

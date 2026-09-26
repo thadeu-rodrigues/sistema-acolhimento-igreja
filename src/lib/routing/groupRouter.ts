@@ -18,7 +18,11 @@ export type Decision =
   | "BATISMO"
   | "EVANGELISMO";
 
-export type VisitReason = "PRIMEIRA_VEZ" | "DECISAO";
+export type VisitReason =
+  | "QUERO_GDC"
+  | "PRIMEIRA_VEZ"
+  | "EVANGELISMO"
+  | "DECISAO";
 
 export interface VisitorFormData {
   fullName: string;
@@ -26,6 +30,8 @@ export interface VisitorFormData {
   neighborhood: string;
   city: string;
   maritalStatus: MaritalStatus;
+  hasChildren?: boolean;
+  childrenCount?: number;
   birthDate: string; // ISO 8601 "YYYY-MM-DD"
   visitReason: VisitReason;
   decisions?: Decision[];

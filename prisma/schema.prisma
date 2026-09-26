@@ -79,9 +79,11 @@ model Visitor {
   city             String
   // maritalStatus: SOLTEIRO | CASADO | NOIVO | DIVORCIADO | VIUVO
   maritalStatus    String    @map("marital_status")
+  hasChildren      Boolean   @default(false) @map("has_children")
+  childrenCount    Int?      @default(0) @map("children_count")
   birthDate        DateTime  @map("birth_date")
   calculatedAge    Int       @map("calculated_age")
-  // visitReason: PRIMEIRA_VEZ | DECISAO
+  // visitReason: QUERO_GDC | PRIMEIRA_VEZ | EVANGELISMO | DECISAO
   visitReason      String    @map("visit_reason")
   // decisions: JSON array string ex: ["ACEITAR_JESUS","BATISMO"]
   decisions        String?   @default("[]")

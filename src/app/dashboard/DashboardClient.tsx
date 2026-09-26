@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react";
 import { useState, useCallback, useMemo, useEffect, Fragment } from "react";
 import QrCodeSection from "./QrCodeSection";
 import QrCodeModal from "./QrCodeModal";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 
 // ── Tipos ────────────────────────────────────────────────
 type Visitor = {
@@ -13,6 +14,8 @@ type Visitor = {
   city: string;
   neighborhood: string;
   maritalStatus: string;
+  hasChildren?: boolean;
+  childrenCount?: number | null;
   birthDate?: string;
   calculatedAge: number;
   visitReason: string;
@@ -101,7 +104,9 @@ const MARITAL_LABELS: Record<string, string> = {
 };
 
 const VISIT_REASON_LABELS: Record<string, string> = {
+  QUERO_GDC:    "Quero um GDC",
   PRIMEIRA_VEZ: "Primeira Vez",
+  EVANGELISMO:  "Evangelismo",
   DECISAO:      "Tomei uma Decisão",
 };
 
@@ -129,15 +134,74 @@ function formatBirthDate(d?: string | null) {
   }
 }
 
-function whatsappUrl(phone: string, name: string, template?: string | null, leaderName?: string) {
+function getMotivoWhatsAppText(visitReason?: string, decisions?: string | null): string {
+  if (visitReason === "PRIMEIRA_VEZ") {
+    return "Vi aqui que você teve contato pela primeira vez com a nossa igreja!";
+  }
+  if (visitReason === "QUERO_GDC") {
+    return "Vi que você gostaria de conhecer um grupo da cidade!";
+  }
+  if (visitReason === "EVANGELISMO") {
+    return "Vi que você conversou com a nossa equipe em uma ação de evangelismo!";
+  }
+  if (visitReason === "DECISAO" || (decisions && decisions !== "[]")) {
+    let decs: string[] = [];
+    try {
+      decs = JSON.parse(decisions || "[]") as string[];
+    } catch {}
+
+    const hasAceitar = decs.includes("ACEITAR_JESUS");
+    const hasRecon = decs.includes("RECONCILIACAO");
+    const hasBatismo = decs.includes("BATISMO");
+
+    if (hasAceitar && hasBatismo) {
+      return "Vi aqui que você tomou a decisão de aceitar a Jesus e também pelo batismo!";
+    }
+    if (hasRecon && hasBatismo) {
+      return "Vi aqui que você tomou a decisão de se reconciliar com Jesus e também pelo batismo!";
+    }
+    if (hasAceitar) {
+      return "Vi aqui que você tomou a decisão de aceitar a Jesus!";
+    }
+    if (hasRecon) {
+      return "Vi aqui que você tomou a decisão de se reconciliar com Jesus!";
+    }
+    if (hasBatismo) {
+      return "Vi aqui que você tomou a decisão pelo batismo!";
+    }
+    return "Vi aqui que você tomou uma decisão de fé!";
+  }
+
+  return "Vi aqui que você teve contato pela primeira vez com a nossa igreja!";
+}
+
+function whatsappUrl(
+  phone: string,
+  name: string,
+  template?: string | null,
+  leaderName?: string,
+  visitReason?: string,
+  decisions?: string | null
+) {
   const digits = phone.replace(/\D/g, "");
   const firstName = name.trim().split(" ")[0];
+  const motivoText = getMotivoWhatsAppText(visitReason, decisions);
+
   let text = template;
   if (text) {
-    text = text.replace(/\{nome\}/gi, firstName).replace(/\{lider\}/gi, leaderName || "da equipe de acolhimento");
+    text = text
+      .replace(/\{nome\}/gi, firstName)
+      .replace(/\{lider\}/gi, leaderName || "da equipe de acolhimento")
+      .replace(/\{motivo\}|\{\*1\*\}|\{decisao\}/gi, motivoText);
+
+    // Se o template antigo mencionava "da rede" e não tinha {motivo}, substitui pelo modelo dinâmico oficial
+    if (text.includes("da rede") && !template?.includes("{motivo}")) {
+      text = `Olá ${firstName}! Sou da equipe de acolhimento da Igreja da Cidade em Taubaté! Como você está? ${motivoText} Gostaria de ter mais informações?`;
+    }
   } else {
-    text = `Olá ${firstName}! Sou da equipe de acolhimento da Igreja da Cidade Taubaté. Que alegria ter você conosco! Como podemos orar por você?`;
+    text = `Olá ${firstName}! Sou da equipe de acolhimento da Igreja da Cidade em Taubaté! Como você está? ${motivoText} Gostaria de ter mais informações?`;
   }
+
   return `https://wa.me/55${digits}?text=${encodeURIComponent(text)}`;
 }
 
@@ -157,9 +221,11 @@ function exportToCSV(visitorsToExport: Visitor[], filename = "relatorio_acolhime
     "Rede Ministerial",
     "Data de Nascimento",
     "Idade",
+    "Estado Civil",
+    "Possui Filhos",
+    "Qtd Filhos",
     "Cidade",
     "Bairro",
-    "Estado Civil",
     "Motivo da Visita",
     "Decisões de Fé",
     "Status Atual",
@@ -186,6 +252,8 @@ function exportToCSV(visitorsToExport: Visitor[], filename = "relatorio_acolhime
     const statusLabel = STATUS_LABELS[v.status]?.label || v.status;
     const maritalLabel = MARITAL_LABELS[v.maritalStatus] || v.maritalStatus;
     const visitReasonLabel = VISIT_REASON_LABELS[v.visitReason] || v.visitReason;
+    const hasChildrenLabel = v.hasChildren ? "Sim" : "Não";
+    const childrenCountVal = v.hasChildren ? (v.childrenCount ?? 1) : 0;
 
     return [
       escapeCSV(v.fullName),
@@ -193,9 +261,11 @@ function exportToCSV(visitorsToExport: Visitor[], filename = "relatorio_acolhime
       escapeCSV(v.group?.name || ""),
       escapeCSV(formatBirthDate(v.birthDate)),
       escapeCSV(v.calculatedAge),
+      escapeCSV(maritalLabel),
+      escapeCSV(hasChildrenLabel),
+      escapeCSV(childrenCountVal),
       escapeCSV(v.city),
       escapeCSV(v.neighborhood),
-      escapeCSV(maritalLabel),
       escapeCSV(visitReasonLabel),
       escapeCSV(decisions),
       escapeCSV(statusLabel),
@@ -239,6 +309,7 @@ export default function DashboardClient({
   // Filtros
   const [filterGroup, setFilterGroup] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterReason, setFilterReason] = useState("ALL");
   const [filterDecision, setFilterDecision] = useState("ALL");
   const [search, setSearch] = useState("");
   // Em telas pequenas (mobile), iniciar em cartões por padrão
@@ -249,6 +320,12 @@ export default function DashboardClient({
       setViewMode("table");
     }
   }, []);
+
+  useEffect(() => {
+    if (!isMasterOrAdmin && (activeTab === "networks" || activeTab === "users")) {
+      setActiveTab("visitors");
+    }
+  }, [isMasterOrAdmin, activeTab]);
 
   const [showNewUser, setShowNewUser] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
@@ -292,6 +369,7 @@ export default function DashboardClient({
     return visitors.filter((v) => {
       if (filterGroup !== "ALL" && v.group.name !== filterGroup) return false;
       if (filterStatus !== "ALL" && v.status !== filterStatus) return false;
+      if (filterReason !== "ALL" && v.visitReason !== filterReason) return false;
       if (filterDecision !== "ALL") {
         try {
           const decs = JSON.parse(v.decisions || "[]") as string[];
@@ -375,6 +453,12 @@ export default function DashboardClient({
     };
   }, [visitors, groups]);
 
+  // Lista de visitantes pendentes (NOVO) — usada no painel da aba Meus Visitantes
+  const pendingVisitors = useMemo(
+    () => visitors.filter((v) => v.status === "NOVO"),
+    [visitors]
+  );
+
   const currentRoleBadge = ROLE_BADGES[role] ?? { label: role, color: "#fff", bg: "#333" };
 
   return (
@@ -426,16 +510,49 @@ export default function DashboardClient({
             <span>QR Code</span>
           </button>
 
-          <span style={{
-            background: currentRoleBadge.bg,
-            color: currentRoleBadge.color,
+          {/* Identificação da Conta Logada */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.45rem",
+            background: "rgba(255,255,255,0.08)",
+            padding: "0.2rem 0.55rem 0.2rem 0.35rem",
             borderRadius: "999px",
-            padding: "2px 8px",
-            fontSize: "0.68rem",
-            fontWeight: 700,
+            border: "1px solid rgba(255,255,255,0.15)",
           }}>
-            {currentRoleBadge.label}
-          </span>
+            <div style={{
+              width: "24px",
+              height: "24px",
+              borderRadius: "50%",
+              background: currentRoleBadge.bg,
+              color: currentRoleBadge.color,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 800,
+              fontSize: "0.72rem",
+            }}>
+              {(session?.user?.name || session?.user?.email || "U").charAt(0).toUpperCase()}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#ffffff", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session?.user?.name || session?.user?.email}
+              </span>
+              <span style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.6)", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {role === "LEADER" ? `Rede ${groups.map((g) => g.name).join(", ") || "Líder"}` : session?.user?.email}
+              </span>
+            </div>
+            <span style={{
+              background: currentRoleBadge.bg,
+              color: currentRoleBadge.color,
+              borderRadius: "999px",
+              padding: "1px 6px",
+              fontSize: "0.62rem",
+              fontWeight: 700,
+            }}>
+              {currentRoleBadge.label}
+            </span>
+          </div>
 
           <button
             id="logout-btn"
@@ -459,25 +576,39 @@ export default function DashboardClient({
       {/* ── Abas de Navegação (Design Pill Touch Responsivo) ── */}
       <div className="dash-nav-container">
         <nav className="dash-nav">
-          {isMasterOrAdmin && (
+          {/* Para Líder: 1ª aba é SEMPRE Meus Visitantes (Página Inicial) */}
+          {!isMasterOrAdmin && (
             <TabButton
-              id="tab-analytics"
-              active={activeTab === "analytics"}
-              onClick={() => setActiveTab("analytics")}
-              icon="📊"
-              label="Métricas"
-              badge={`${metrics.taxaIntegracao}%`}
+              id="tab-visitors"
+              active={activeTab === "visitors"}
+              onClick={() => setActiveTab("visitors")}
+              icon="👥"
+              label="Meus Visitantes"
+              count={visitors.length}
             />
           )}
 
+          {/* Aba de Métricas (1ª para Admin como 'Métricas', 2ª para Líder como 'Métricas da Rede') */}
           <TabButton
-            id="tab-visitors"
-            active={activeTab === "visitors"}
-            onClick={() => setActiveTab("visitors")}
-            icon="👥"
-            label={isMasterOrAdmin ? "Visitantes" : "Meus Visitantes"}
-            count={visitors.length}
+            id="tab-analytics"
+            active={activeTab === "analytics"}
+            onClick={() => setActiveTab("analytics")}
+            icon="📊"
+            label={isMasterOrAdmin ? "Métricas" : "Métricas da Rede"}
+            badge={`${metrics.taxaIntegracao}%`}
           />
+
+          {/* Para Admin/Master: 2ª aba é Visitantes */}
+          {isMasterOrAdmin && (
+            <TabButton
+              id="tab-visitors"
+              active={activeTab === "visitors"}
+              onClick={() => setActiveTab("visitors")}
+              icon="👥"
+              label="Visitantes"
+              count={visitors.length}
+            />
+          )}
 
           {isMasterOrAdmin && (
             <TabButton
@@ -515,214 +646,15 @@ export default function DashboardClient({
       <main className="dash-main">
 
         {/* ══════════════════════════════════════════════════════════ */}
-        {/* ABA 1: MÉTRICAS & INDICADORES (MASTER / ADMIN)           */}
+        {/* ABA 1: MÉTRICAS & INDICADORES (COM FILTROS DE DATA & GRÁFICOS) */}
         {/* ══════════════════════════════════════════════════════════ */}
-        {activeTab === "analytics" && isMasterOrAdmin && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-            {/* Topo Métricas */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.6rem" }}>
-              <div>
-                <h1 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#111827", margin: 0 }}>
-                  Painel de Métricas
-                </h1>
-                <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "2px 0 0 0" }}>
-                  Acompanhamento do acolhimento em tempo real.
-                </p>
-              </div>
-
-              <button
-                id="export-metrics-csv-btn"
-                onClick={() => exportToCSV(visitors, `relatorio_geral_${new Date().toISOString().split("T")[0]}.csv`)}
-                className="dash-mobile-full"
-                style={{
-                  background: "#0A0A0A",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "999px",
-                  padding: "0.45rem 0.95rem",
-                  fontWeight: 600,
-                  fontSize: "0.78rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.4rem",
-                }}
-              >
-                <span>📥</span> Exportar Todos (CSV)
-              </button>
-            </div>
-
-            {/* Grid de KPIs (2 colunas no mobile, 5 no desktop) */}
-            <div className="dash-kpi-grid">
-              <KpiCard title="Total" value={metrics.total} subtitle="Cadastros" color="#0A0A0A" icon="👥" />
-              <KpiCard title="Novos" value={metrics.novos} subtitle="Pendente contato" color="#2563eb" icon="⚡" highlight={metrics.novos > 0} />
-              <KpiCard title="Em Contato" value={metrics.emContato} subtitle="Acompanhamento" color="#d97706" icon="💬" />
-              <KpiCard title="Integrados" value={metrics.integrados} subtitle="Membros/Célula" color="#16a34a" icon="✨" />
-              <KpiCard title="Taxa de Integração" value={`${metrics.taxaIntegracao}%`} subtitle={`${metrics.taxaContato}% contato iniciado`} color="#7c3aed" icon="📈" isHero />
-            </div>
-
-            {/* Funil Visual do Acolhimento */}
-            <div style={{ background: "white", borderRadius: "14px", padding: "1.15rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.4rem" }}>
-                <div>
-                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "#111827" }}>
-                    Funil do Processo de Acolhimento
-                  </h3>
-                  <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
-                    Evolução da recepção à integração
-                  </span>
-                </div>
-                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#16a34a", background: "#f0fdf4", padding: "2px 8px", borderRadius: "999px" }}>
-                  Conversão: {metrics.taxaIntegracao}%
-                </span>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-                <FunnelStep
-                  label="1. Novos Cadastros (Chegaram)"
-                  count={metrics.total}
-                  percent={metrics.total > 0 ? 100 : 0}
-                  color="#2563eb"
-                  badge={`${metrics.novos} novos`}
-                />
-                <FunnelStep
-                  label="2. Contato Realizado (WhatsApp/Ligação)"
-                  count={metrics.emContato + metrics.integrados}
-                  percent={metrics.taxaContato}
-                  color="#d97706"
-                  badge={`${metrics.emContato} em andamento`}
-                />
-                <FunnelStep
-                  label="3. Integrados (Célula/Ministério)"
-                  count={metrics.integrados}
-                  percent={metrics.taxaIntegracao}
-                  color="#16a34a"
-                  badge="Concluído"
-                />
-                {metrics.semResposta > 0 && (
-                  <FunnelStep
-                    label="Sem Resposta / Retentar"
-                    count={metrics.semResposta}
-                    percent={metrics.total > 0 ? Math.round((metrics.semResposta / metrics.total) * 100) : 0}
-                    color="#9ca3af"
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Grid 2 Colunas: Redes + Decisões */}
-            <div className="dash-two-col">
-
-              {/* Redes Ministeriais */}
-              <div style={{ background: "white", borderRadius: "14px", padding: "1.15rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.75rem 0", color: "#111827" }}>
-                  Visitantes por Rede Ministerial
-                </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-                  {groups.map((g) => {
-                    const stats = metrics.byGroup[g.name] || { total: 0, integrados: 0, novos: 0, emContato: 0 };
-                    const styling = GROUP_COLORS[g.name] || { color: "#6b7280", bg: "#f3f4f6", title: g.description || "" };
-                    const rate = stats.total > 0 ? Math.round((stats.integrados / stats.total) * 100) : 0;
-
-                    return (
-                      <div key={g.id} style={{ border: "1px solid #f0f0f0", borderRadius: "10px", padding: "0.75rem", background: "#fafafa" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
-                          <div>
-                            <span style={{
-                              fontWeight: 800,
-                              fontSize: "0.82rem",
-                              color: styling.color,
-                              background: styling.bg,
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                            }}>
-                              {g.name}
-                            </span>
-                            <span className="dash-hide-mobile" style={{ fontSize: "0.7rem", color: "#6b7280", marginLeft: "6px" }}>
-                              {styling.title}
-                            </span>
-                          </div>
-                          <div style={{ fontWeight: 800, fontSize: "0.9rem", color: "#111827" }}>
-                            {stats.total} <span style={{ fontSize: "0.7rem", fontWeight: 400, color: "#6b7280" }}>visitantes</span>
-                          </div>
-                        </div>
-
-                        {/* Barra de status visual */}
-                        <div style={{ width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "999px", overflow: "hidden", display: "flex", margin: "0.35rem 0" }}>
-                          <div style={{ width: `${stats.total > 0 ? (stats.integrados / stats.total) * 100 : 0}%`, background: "#16a34a" }} />
-                          <div style={{ width: `${stats.total > 0 ? (stats.emContato / stats.total) * 100 : 0}%`, background: "#d97706" }} />
-                          <div style={{ width: `${stats.total > 0 ? (stats.novos / stats.total) * 100 : 0}%`, background: "#2563eb" }} />
-                        </div>
-
-                        {/* Mini grade de estatísticas limpa */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px", fontSize: "0.72rem", textAlign: "center", marginTop: "0.35rem" }}>
-                          <div style={{ background: "#eff6ff", color: "#2563eb", padding: "3px 4px", borderRadius: "4px", fontWeight: 500 }}>
-                            Novos: <strong>{stats.novos}</strong>
-                          </div>
-                          <div style={{ background: "#fffbeb", color: "#d97706", padding: "3px 4px", borderRadius: "4px", fontWeight: 500 }}>
-                            Contato: <strong>{stats.emContato}</strong>
-                          </div>
-                          <div style={{ background: "#f0fdf4", color: "#16a34a", padding: "3px 4px", borderRadius: "4px", fontWeight: 500 }}>
-                            Integrados: <strong>{stats.integrados}</strong> ({rate}%)
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Decisões de Fé & Estado Civil */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {/* Decisões */}
-                <div style={{ background: "white", borderRadius: "14px", padding: "1.15rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.75rem 0", color: "#111827" }}>
-                    Decisões de Fé Registradas
-                  </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                    {Object.entries(DECISION_MAP).map(([key, label]) => {
-                      const count = metrics.decisionsCount[key] || 0;
-                      const pct = metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0;
-                      return (
-                        <div key={key}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", marginBottom: "0.2rem" }}>
-                            <span style={{ fontWeight: 600, color: "#374151" }}>{label}</span>
-                            <span style={{ fontWeight: 700, color: "#E8351A" }}>{count} ({pct}%)</span>
-                          </div>
-                          <div style={{ width: "100%", height: "5px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: "#E8351A", borderRadius: "999px" }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Perfil por Estado Civil */}
-                <div style={{ background: "white", borderRadius: "14px", padding: "1.15rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: "0 0 0.75rem 0", color: "#111827" }}>
-                    Perfil por Estado Civil
-                  </h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(75px, 1fr))", gap: "0.4rem" }}>
-                    {Object.entries(metrics.maritalCount).map(([status, count]) => (
-                      <div key={status} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "0.4rem 0.3rem", textAlign: "center" }}>
-                        <div style={{ fontSize: "0.62rem", color: "#6b7280", textTransform: "uppercase", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {status}
-                        </div>
-                        <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#111827" }}>
-                          {count}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
+        {activeTab === "analytics" && (
+          <AnalyticsDashboard
+            visitors={visitors}
+            groups={groups}
+            role={role}
+            exportToCSV={exportToCSV}
+          />
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}
@@ -731,18 +663,310 @@ export default function DashboardClient({
         {activeTab === "visitors" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
+            {/* Banner de Identificação do Líder Conectado (para role LEADER) */}
+            {!isMasterOrAdmin && (
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #ffffff 0%, #fff7ed 100%)",
+                  border: "1.5px solid #fed7aa",
+                  borderRadius: "14px",
+                  padding: "0.95rem 1.15rem",
+                  boxShadow: "0 2px 6px rgba(234,88,12,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                  <div
+                    style={{
+                      width: "44px",
+                      height: "44px",
+                      borderRadius: "12px",
+                      background: "#E8351A",
+                      color: "white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.3rem",
+                      fontWeight: 900,
+                      boxShadow: "0 4px 10px rgba(232,53,26,0.25)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    👤
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                      <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 800, color: "#111827" }}>
+                        Conta Conectada: {session?.user?.name || "Líder"}
+                      </h3>
+                      <span
+                        style={{
+                          background: "#ffedd5",
+                          color: "#c2410c",
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          padding: "1px 7px",
+                          borderRadius: "999px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Líder de Rede
+                      </span>
+                    </div>
+                    <p style={{ margin: "3px 0 0 0", fontSize: "0.78rem", color: "#4b5563" }}>
+                      E-mail: <strong>{session?.user?.email}</strong> · Rede vinculada:{" "}
+                      <strong style={{ color: "#E8351A" }}>
+                        {groups.length > 0 ? groups.map((g) => g.name).join(", ") : "Nenhuma rede vinculada"}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    background: "white",
+                    padding: "0.4rem 0.8rem",
+                    borderRadius: "8px",
+                    border: "1px solid #fdba74",
+                    color: "#9a3412",
+                    fontWeight: 600,
+                  }}
+                >
+                  🔒 Exibindo apenas os visitantes direcionados à sua rede ({groups.map((g) => g.name).join(", ")}).
+                </div>
+              </div>
+            )}
+
+            {/* Pendências de Primeiro Contato — apenas para líderes */}
+            {!isMasterOrAdmin && (
+              <div
+                style={{
+                  background: "white",
+                  borderRadius: "14px",
+                  padding: "1.2rem",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                  border: pendingVisitors.length > 0 ? "1.5px solid #fde68a" : "1px solid #e5e7eb",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <div>
+                    <h3 style={{ fontSize: "0.98rem", fontWeight: 800, margin: 0, color: "#111827", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                      <span>{pendingVisitors.length > 0 ? "⚠️" : "✅"}</span>
+                      <span>Pendências de Primeiro Contato ({pendingVisitors.length})</span>
+                    </h3>
+                    <span style={{ fontSize: "0.74rem", color: "#6b7280" }}>
+                      {pendingVisitors.length > 0
+                        ? "Pessoas da sua rede que preencheram a ficha e aguardam o primeiro retorno:"
+                        : "Todos os contatos recebidos já receberam atendimento."}
+                    </span>
+                  </div>
+                  {pendingVisitors.length > 0 && (
+                    <span style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fef3c7", fontSize: "0.72rem", fontWeight: 800, padding: "3px 10px", borderRadius: "999px" }}>
+                      {pendingVisitors.length} {pendingVisitors.length === 1 ? "pendência ativa" : "pendências ativas"}
+                    </span>
+                  )}
+                </div>
+
+                {pendingVisitors.length === 0 ? (
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", padding: "1.5rem", textAlign: "center", color: "#166534" }}>
+                    <div style={{ fontSize: "1.8rem", marginBottom: "0.3rem" }}>🎉</div>
+                    <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>Tudo em dia! Nenhuma pendência de contato.</div>
+                    <p style={{ fontSize: "0.75rem", margin: "4px 0 0 0", color: "#15803d" }}>
+                      Excelente trabalho! Todos os contatos recebidos foram atendidos.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    {pendingVisitors.map((v) => {
+                      const motivoLabel = VISIT_REASON_LABELS[v.visitReason] || v.visitReason;
+                      const wppLink = whatsappUrl(v.phone, v.fullName, v.group?.whatsappTemplate, v.assignedLeader?.name, v.visitReason, v.decisions);
+                      return (
+                        <div
+                          key={v.id}
+                          style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "#fef3c7", color: "#b45309", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "0.9rem", flexShrink: 0 }}>
+                              {v.fullName.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: "0.92rem", color: "#111827" }}>{v.fullName}</div>
+                              <div style={{ fontSize: "0.73rem", color: "#6b7280", display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap", marginTop: "2px" }}>
+                                <span>📞 {v.phone}</span>
+                                <span>·</span>
+                                <span>Chegou em: <strong>{formatDate(v.createdAt)}</strong></span>
+                                <span>·</span>
+                                <span style={{ background: "#fee2e2", color: "#991b1b", padding: "1px 7px", borderRadius: "4px", fontSize: "0.68rem", fontWeight: 700 }}>
+                                  {motivoLabel}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <a
+                            href={wppLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ background: "#25D366", color: "white", borderRadius: "8px", padding: "0.5rem 1rem", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: "0.45rem", boxShadow: "0 2px 4px rgba(37,211,102,0.25)" }}
+                          >
+                            <span>💬</span> Dar Retorno no WhatsApp
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Banner Dinâmico de Link & QR Code */}
             <QrCodeSection compact onOpenModal={() => setShowQrModal(true)} />
+
+            {/* Cards Operacionais de Status (Visão Rápida & Filtro em 1 Clique) */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: "0.6rem",
+              }}
+            >
+              {[
+                {
+                  id: "ALL",
+                  label: isMasterOrAdmin ? "Total Geral" : "Total Recebidos",
+                  count: visitors.length,
+                  icon: "📋",
+                  color: "#111827",
+                  bg: "#f3f4f6",
+                  border: "#e5e7eb",
+                },
+                {
+                  id: "NOVO",
+                  label: "Novos Contatos",
+                  count: metrics.novos,
+                  icon: "🟡",
+                  color: "#d97706",
+                  bg: "#fffbeb",
+                  border: "#fde68a",
+                  badge: metrics.novos > 0 ? "Aguardando" : undefined,
+                },
+                {
+                  id: "EM_CONTATO",
+                  label: "Em Contato",
+                  count: metrics.emContato,
+                  icon: "🔵",
+                  color: "#2563eb",
+                  bg: "#eff6ff",
+                  border: "#bfdbfe",
+                },
+                {
+                  id: "INTEGRADO",
+                  label: "Integrados",
+                  count: metrics.integrados,
+                  icon: "🟢",
+                  color: "#16a34a",
+                  bg: "#f0fdf4",
+                  border: "#bbf7d0",
+                },
+                {
+                  id: "SEM_RESPOSTA",
+                  label: "Sem Resposta",
+                  count: metrics.semResposta,
+                  icon: "⚪",
+                  color: "#6b7280",
+                  bg: "#f9fafb",
+                  border: "#e5e7eb",
+                },
+                {
+                  id: "TAXA",
+                  label: "Taxa Integração",
+                  count: `${metrics.taxaIntegracao}%`,
+                  icon: "📈",
+                  color: "#7c3aed",
+                  bg: "#faf5ff",
+                  border: "#e9d5ff",
+                  isRate: true,
+                },
+              ].map((card) => {
+                const isActive = filterStatus === card.id;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => {
+                      if (card.isRate) return;
+                      setFilterStatus(isActive ? "ALL" : card.id);
+                    }}
+                    style={{
+                      background: isActive ? card.bg : "white",
+                      border: isActive ? `2px solid ${card.color}` : `1px solid ${card.border}`,
+                      borderRadius: "12px",
+                      padding: "0.75rem 0.85rem",
+                      textAlign: "left",
+                      cursor: card.isRate ? "default" : "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: "0.35rem",
+                      boxShadow: isActive
+                        ? `0 4px 12px ${card.color}22`
+                        : "0 1px 3px rgba(0,0,0,0.04)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: card.color }}>
+                        {card.icon} {card.label}
+                      </span>
+                      {card.badge && (
+                        <span
+                          style={{
+                            fontSize: "0.6rem",
+                            fontWeight: 800,
+                            background: "#fef3c7",
+                            color: "#b45309",
+                            padding: "1px 5px",
+                            borderRadius: "999px",
+                          }}
+                        >
+                          {card.badge}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem" }}>
+                      <span style={{ fontSize: "1.35rem", fontWeight: 900, color: card.color }}>
+                        {card.count}
+                      </span>
+                      {!card.isRate && card.id !== "ALL" && visitors.length > 0 && (
+                        <span style={{ fontSize: "0.68rem", color: "#9ca3af" }}>
+                          ({Math.round(((card.count as number) / visitors.length) * 100)}%)
+                        </span>
+                      )}
+                    </div>
+                    {!card.isRate && (
+                      <span style={{ fontSize: "0.65rem", color: isActive ? card.color : "#9ca3af", fontWeight: isActive ? 700 : 500 }}>
+                        {isActive ? "✓ Filtrando lista" : "Clique para filtrar"}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Topo Filtros e Exportação */}
             <div style={{ background: "white", borderRadius: "14px", padding: "1.15rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.65rem", marginBottom: "0.75rem" }}>
                 <div>
                   <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#111827", margin: 0 }}>
-                    {isMasterOrAdmin ? "Visitantes Cadastrados" : "Meus Visitantes"}
+                    {isMasterOrAdmin ? "Visitantes Cadastrados" : `Meus Visitantes — Rede ${groups.map(g => g.name).join(", ")}`}
                   </h2>
                   <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>
                     Mostrando <strong>{filteredVisitors.length}</strong> de <strong>{visitors.length}</strong> registros
+                    {!isMasterOrAdmin && ` · Líder: ${session?.user?.name || session?.user?.email}`}
                   </span>
                 </div>
 
@@ -873,6 +1097,28 @@ export default function DashboardClient({
                 </select>
 
                 <select
+                  id="filter-reason"
+                  value={filterReason}
+                  onChange={(e) => setFilterReason(e.target.value)}
+                  style={{
+                    padding: "0.55rem 0.75rem",
+                    border: "1.5px solid #e5e7eb",
+                    borderRadius: "8px",
+                    fontSize: "0.85rem",
+                    background: "white",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  <option value="ALL">Todos os Motivos</option>
+                  {Object.entries(VISIT_REASON_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+
+                <select
                   id="filter-decision"
                   value={filterDecision}
                   onChange={(e) => setFilterDecision(e.target.value)}
@@ -967,7 +1213,12 @@ export default function DashboardClient({
                               <td style={{ padding: "0.75rem 0.85rem" }}>
                                 <div style={{ fontWeight: 700, color: "#111827" }}>{v.fullName}</div>
                                 <div style={{ fontSize: "0.68rem", color: "#6b7280" }}>
-                                  {MARITAL_LABELS[v.maritalStatus] || v.maritalStatus} · {VISIT_REASON_LABELS[v.visitReason] || v.visitReason}
+                                  {MARITAL_LABELS[v.maritalStatus] || v.maritalStatus}
+                                  {v.hasChildren ? ` · 👶 ${v.childrenCount ?? 1} ${Number(v.childrenCount) === 1 ? "filho" : "filhos"}` : ""}
+                                  {" · "}
+                                  <span style={{ fontWeight: 600, color: "#374151" }}>
+                                    {VISIT_REASON_LABELS[v.visitReason] || v.visitReason}
+                                  </span>
                                 </div>
                               </td>
 
@@ -1044,7 +1295,7 @@ export default function DashboardClient({
                                   </button>
                                   <a
                                     id={`table-wa-${v.id}`}
-                                    href={whatsappUrl(v.phone, v.fullName, v.group?.whatsappTemplate, v.assignedLeader?.name)}
+                                    href={whatsappUrl(v.phone, v.fullName, v.group?.whatsappTemplate, v.assignedLeader?.name, v.visitReason, v.decisions)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
@@ -1269,34 +1520,57 @@ export default function DashboardClient({
 
       {/* ── Barra de Navegação Inferior (Mobile App Style) ── */}
       <nav className="dash-bottom-nav">
-        {isMasterOrAdmin && (
+        {/* Para Líder: Primeiro botão é Meus Visitantes (Página Inicial) */}
+        {!isMasterOrAdmin && (
           <button
             type="button"
-            onClick={() => setActiveTab("analytics")}
-            className={`dash-bottom-btn ${activeTab === "analytics" ? "active" : ""}`}
+            id="mobile-nav-leader-visitors"
+            onClick={() => setActiveTab("visitors")}
+            className={`dash-bottom-btn ${activeTab === "visitors" ? "active" : ""}`}
           >
-            <span className="dash-bottom-icon">📊</span>
-            <span>Métricas</span>
+            <span className="dash-bottom-icon">
+              👥
+              {visitors.length > 0 && (
+                <span className="dash-bottom-badge">{visitors.length}</span>
+              )}
+            </span>
+            <span>Meus Visitantes</span>
           </button>
         )}
 
+        {/* Métricas: 1º para Admin ('Métricas'), 2º para Líder ('Métricas da Rede') */}
         <button
           type="button"
-          onClick={() => setActiveTab("visitors")}
-          className={`dash-bottom-btn ${activeTab === "visitors" ? "active" : ""}`}
+          id="mobile-nav-analytics"
+          onClick={() => setActiveTab("analytics")}
+          className={`dash-bottom-btn ${activeTab === "analytics" ? "active" : ""}`}
         >
-          <span className="dash-bottom-icon">
-            👥
-            {visitors.length > 0 && (
-              <span className="dash-bottom-badge">{visitors.length}</span>
-            )}
-          </span>
-          <span>Visitantes</span>
+          <span className="dash-bottom-icon">📊</span>
+          <span>{isMasterOrAdmin ? "Métricas" : "Métricas"}</span>
         </button>
+
+        {/* Para Admin: 2º botão é Visitantes */}
+        {isMasterOrAdmin && (
+          <button
+            type="button"
+            id="mobile-nav-admin-visitors"
+            onClick={() => setActiveTab("visitors")}
+            className={`dash-bottom-btn ${activeTab === "visitors" ? "active" : ""}`}
+          >
+            <span className="dash-bottom-icon">
+              👥
+              {visitors.length > 0 && (
+                <span className="dash-bottom-badge">{visitors.length}</span>
+              )}
+            </span>
+            <span>Visitantes</span>
+          </button>
+        )}
 
         {isMasterOrAdmin && (
           <button
             type="button"
+            id="mobile-nav-networks"
             onClick={() => setActiveTab("networks")}
             className={`dash-bottom-btn ${activeTab === "networks" ? "active" : ""}`}
           >
@@ -1308,6 +1582,7 @@ export default function DashboardClient({
         {isMasterOrAdmin && (
           <button
             type="button"
+            id="mobile-nav-users"
             onClick={() => setActiveTab("users")}
             className={`dash-bottom-btn ${activeTab === "users" ? "active" : ""}`}
           >
@@ -1318,6 +1593,7 @@ export default function DashboardClient({
 
         <button
           type="button"
+          id="mobile-nav-qrcode"
           onClick={() => setActiveTab("qrcode")}
           className={`dash-bottom-btn ${activeTab === "qrcode" ? "active" : ""}`}
         >
@@ -1577,15 +1853,25 @@ function NetworkCard({
               background: "#f9fafb",
               border: "1px dashed #d1d5db",
               borderRadius: "8px",
-              padding: "0.5rem 0.65rem",
+              padding: "0.55rem 0.7rem",
               fontSize: "0.72rem",
-              color: "#4b5563",
-              lineHeight: 1.35,
+              color: "#374151",
+              lineHeight: 1.4,
             }}>
-              <span style={{ fontWeight: 700, color: "#111827", display: "block", marginBottom: "2px" }}>
-                💬 Template WhatsApp:
-              </span>
-              &ldquo;{g.whatsappTemplate}&rdquo;
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <span style={{ fontWeight: 700, color: "#111827", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                  <span>💬</span> Template WhatsApp Inteligente:
+                </span>
+                <span style={{ fontSize: "0.65rem", background: "#e0f2fe", color: "#0369a1", padding: "1px 6px", borderRadius: "999px", fontWeight: 700 }}>
+                  Acolhimento IC
+                </span>
+              </div>
+              <div style={{ fontStyle: "italic", color: "#4b5563" }}>
+                &ldquo;{g.whatsappTemplate}&rdquo;
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "0.66rem", color: "#6b7280", borderTop: "1px dashed #e5e7eb", paddingTop: "3px" }}>
+                ✨ <strong>{"{motivo}"}</strong> adapta-se automaticamente: 1ª Vez, Quero GDC, Evangelismo ou Decisões de Fé.
+              </div>
             </div>
           )}
 
@@ -1691,7 +1977,7 @@ function GroupEditForm({
   const [description, setDescription] = useState(group?.description ?? "");
   const [whatsappTemplate, setWhatsappTemplate] = useState(
     group?.whatsappTemplate ??
-      `Olá {nome}! Sou {lider} da rede ${group?.name || ""} da Igreja da Cidade Taubaté. Que alegria ter você conosco!`
+      "Olá {nome}! Sou da equipe de acolhimento da Igreja da Cidade em Taubaté! Como você está? {motivo} Gostaria de ter mais informações?"
   );
   const [active, setActive] = useState(group?.active ?? true);
   const initialLeaderIds = group?.leaders?.map((l) => l.user.id) ?? [];
@@ -1823,12 +2109,12 @@ function GroupEditForm({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.2rem" }}>
           <label style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>
             Template Mensagem WhatsApp
           </label>
-          <span style={{ fontSize: "0.68rem", color: "#9ca3af" }}>
-            Tags: <code>{"{nome}"}</code> e <code>{"{lider}"}</code>
+          <span style={{ fontSize: "0.68rem", color: "#6b7280" }}>
+            Variáveis: <code>{"{nome}"}</code> e <code>{"{motivo}"}</code>
           </span>
         </div>
         <textarea
@@ -1836,9 +2122,12 @@ function GroupEditForm({
           rows={3}
           value={whatsappTemplate}
           onChange={(e) => setWhatsappTemplate(e.target.value)}
-          placeholder="Olá {nome}! Sou {lider} da equipe..."
+          placeholder="Olá {nome}! Sou da equipe de acolhimento da Igreja da Cidade em Taubaté! Como você está? {motivo} Gostaria de ter mais informações?"
           style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
         />
+        <div style={{ fontSize: "0.68rem", color: "#6b7280", lineHeight: 1.35 }}>
+          ℹ️ A tag <strong>{"{motivo}"}</strong> é substituída automaticamente de acordo com o formulário da pessoa: <em>Primeira Vez</em>, <em>Quero GDC</em>, <em>Evangelismo</em> ou a <em>Decisão de Fé</em> (Aceitar Jesus, Reconciliação, Batismo).
+        </div>
       </div>
 
       {/* Seletor de Líderes e Administradores */}
@@ -2367,6 +2656,18 @@ function VisitorDossier({
           <Info label="Data de Nascimento" value={formatBirthDate(v.birthDate)} />
           <Info label="Idade Calculada" value={`${v.calculatedAge} anos`} />
           <Info label="Estado Civil" value={MARITAL_LABELS[v.maritalStatus] || v.maritalStatus} />
+          <Info
+            label="Possui Filhos?"
+            value={
+              v.hasChildren ? (
+                <span style={{ color: "#0891b2", fontWeight: 700 }}>
+                  👶 Sim ({v.childrenCount ?? 1} {Number(v.childrenCount) === 1 ? "filho" : "filhos"})
+                </span>
+              ) : (
+                "Não"
+              )
+            }
+          />
         </div>
       </div>
 
@@ -2468,7 +2769,7 @@ function VisitorDossier({
       <div style={{ marginTop: "0.15rem" }}>
         <a
           id={`whatsapp-${v.id}`}
-          href={whatsappUrl(v.phone, v.fullName, v.group?.whatsappTemplate, v.assignedLeader?.name)}
+          href={whatsappUrl(v.phone, v.fullName, v.group?.whatsappTemplate, v.assignedLeader?.name, v.visitReason, v.decisions)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -2582,7 +2883,9 @@ function VisitorCard({
             {v.fullName}
           </div>
           <div style={{ fontSize: "0.72rem", color: "#6b7280" }}>
-            {v.calculatedAge} anos ({formatBirthDate(v.birthDate)}) · {v.neighborhood ? `${v.neighborhood}, ` : ""}{v.city} · <strong>{v.group?.name}</strong>
+            {v.calculatedAge} anos ({formatBirthDate(v.birthDate)}) · {MARITAL_LABELS[v.maritalStatus] || v.maritalStatus}
+            {v.hasChildren ? ` · 👶 ${v.childrenCount ?? 1} ${Number(v.childrenCount) === 1 ? "filho" : "filhos"}` : ""}
+            {" · "}{v.neighborhood ? `${v.neighborhood}, ` : ""}{v.city} · <strong>{v.group?.name}</strong> · <span style={{ color: "#374151", fontWeight: 600 }}>{VISIT_REASON_LABELS[v.visitReason] || v.visitReason}</span>
           </div>
         </div>
 

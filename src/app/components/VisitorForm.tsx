@@ -5,8 +5,8 @@ import { submitVisitor, VisitorFormState } from "@/app/actions/submitVisitor";
 
 // ── Tipos locais ──────────────────────────────────────────
 type MaritalStatus = "SOLTEIRO" | "CASADO" | "NOIVO" | "DIVORCIADO" | "VIUVO";
-type VisitReason = "PRIMEIRA_VEZ" | "DECISAO";
-type Decision = "ACEITAR_JESUS" | "RECONCILIACAO" | "BATISMO" | "EVANGELISMO";
+type VisitReason = "QUERO_GDC" | "PRIMEIRA_VEZ" | "EVANGELISMO" | "DECISAO";
+type Decision = "ACEITAR_JESUS" | "RECONCILIACAO" | "BATISMO";
 
 const MARITAL_OPTIONS: { value: MaritalStatus; label: string }[] = [
   { value: "SOLTEIRO", label: "Solteiro(a)" },
@@ -16,11 +16,17 @@ const MARITAL_OPTIONS: { value: MaritalStatus; label: string }[] = [
   { value: "VIUVO", label: "Viúvo(a)" },
 ];
 
-const DECISION_OPTIONS: { value: Decision; label: string }[] = [
-  { value: "ACEITAR_JESUS", label: "Aceitar Jesus" },
-  { value: "RECONCILIACAO", label: "Reconciliação" },
-  { value: "BATISMO",       label: "Batismo" },
-  { value: "EVANGELISMO",   label: "Evangelismo" },
+const REASON_OPTIONS: { value: VisitReason; label: string; id: string }[] = [
+  { value: "QUERO_GDC",    label: "Quero um GDC",     id: "reason-gdc" },
+  { value: "PRIMEIRA_VEZ", label: "Primeira Vez",      id: "reason-primeira" },
+  { value: "EVANGELISMO",  label: "Evangelismo",       id: "reason-evangelismo" },
+  { value: "DECISAO",      label: "Tomei uma Decisão", id: "reason-decisao" },
+];
+
+const DECISION_OPTIONS: { value: Decision; label: string; numberPrefix: string }[] = [
+  { value: "ACEITAR_JESUS", label: "Aceitar Jesus", numberPrefix: "1" },
+  { value: "RECONCILIACAO", label: "Reconciliação", numberPrefix: "2" },
+  { value: "BATISMO",       label: "Batismo",       numberPrefix: "3" },
 ];
 
 const GROUP_LABELS: Record<string, { name: string; desc: string }> = {
@@ -67,6 +73,8 @@ export default function VisitorForm() {
   // Estado local dos campos interativos
   const [phone, setPhone] = useState("");
   const [marital, setMarital] = useState<MaritalStatus | "">("");
+  const [hasChildren, setHasChildren] = useState<boolean | null>(null);
+  const [childrenCount, setChildrenCount] = useState<string>("");
   const [visitReason, setVisitReason] = useState<VisitReason | "">("");
   const [decisions, setDecisions] = useState<Decision[]>([]);
 
@@ -124,9 +132,27 @@ export default function VisitorForm() {
               document.getElementById("marital-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
               return;
             }
+            if (hasChildren === null) {
+              e.preventDefault();
+              setClientError("Por favor, responda se possui filhos.");
+              document.getElementById("children-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            if (hasChildren && (!childrenCount || Number(childrenCount) <= 0)) {
+              e.preventDefault();
+              setClientError("Por favor, informe quantos filhos possui.");
+              document.getElementById("children-count-input")?.focus();
+              return;
+            }
             if (!visitReason) {
               e.preventDefault();
               setClientError("Por favor, selecione o Motivo da Visita.");
+              document.getElementById("visit-reason-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            if (visitReason === "DECISAO" && decisions.length === 0) {
+              e.preventDefault();
+              setClientError("Por favor, selecione qual decisão você tomou.");
               document.getElementById("visit-reason-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
               return;
             }
@@ -254,6 +280,72 @@ export default function VisitorForm() {
             )}
           </div>
 
+          {/* ── Possui Filhos (Pills + Campo Condicional) ── */}
+          <div className="form-group" id="children-section">
+            <label className="form-label">Possui filhos?</label>
+            <input
+              type="hidden"
+              name="hasChildren"
+              value={hasChildren === null ? "" : hasChildren ? "true" : "false"}
+            />
+            <div className="pill-group">
+              <button
+                type="button"
+                id="children-no"
+                onClick={() => {
+                  setHasChildren(false);
+                  setChildrenCount("");
+                  setClientError(null);
+                }}
+                className={`pill-btn ${hasChildren === false ? "selected" : ""}`}
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                id="children-yes"
+                onClick={() => {
+                  setHasChildren(true);
+                  if (!childrenCount) setChildrenCount("1");
+                  setClientError(null);
+                }}
+                className={`pill-btn ${hasChildren === true ? "selected" : ""}`}
+              >
+                Sim
+              </button>
+            </div>
+            {state.errors?.hasChildren && (
+              <span className="form-error">⚠ Responda se possui filhos</span>
+            )}
+
+            {hasChildren && (
+              <div style={{ marginTop: "0.65rem", animation: "slideDown 0.2s ease" }}>
+                <label
+                  className="form-label"
+                  htmlFor="children-count-input"
+                  style={{ fontSize: "0.78rem", color: "var(--ic-gray-600)", marginBottom: "0.3rem" }}
+                >
+                  Quantos filhos?
+                </label>
+                <input
+                  id="children-count-input"
+                  name="childrenCount"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={childrenCount}
+                  onChange={(e) => setChildrenCount(e.target.value)}
+                  placeholder="Ex: 1"
+                  className={`form-input ${state.errors?.childrenCount ? "error" : ""}`}
+                  required
+                />
+                {state.errors?.childrenCount && (
+                  <span className="form-error">⚠ {state.errors.childrenCount[0]}</span>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* ── Data de Nascimento ── */}
           <div className="form-group">
             <label className="form-label" htmlFor="birthDate">
@@ -280,34 +372,24 @@ export default function VisitorForm() {
             <label className="form-label">Motivo da Visita</label>
             <input type="hidden" name="visitReason" value={visitReason} />
             <div className="reason-grid">
-              {/* Card: Primeira Vez */}
-              <button
-                type="button"
-                id="reason-primeira"
-                onClick={() => {
-                  setVisitReason("PRIMEIRA_VEZ");
-                  setDecisions([]);
-                  setClientError(null);
-                }}
-                className={`reason-card ${visitReason === "PRIMEIRA_VEZ" ? "selected" : ""}`}
-              >
-                <div className="radio-dot" />
-                <span className="reason-card-label">Primeira Vez</span>
-              </button>
-
-              {/* Card: Tomei uma decisão */}
-              <button
-                type="button"
-                id="reason-decisao"
-                onClick={() => {
-                  setVisitReason("DECISAO");
-                  setClientError(null);
-                }}
-                className={`reason-card ${visitReason === "DECISAO" ? "selected" : ""}`}
-              >
-                <div className="radio-dot" />
-                <span className="reason-card-label">Tomei uma Decisão</span>
-              </button>
+              {REASON_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  id={opt.id}
+                  onClick={() => {
+                    setVisitReason(opt.value);
+                    if (opt.value !== "DECISAO") {
+                      setDecisions([]);
+                    }
+                    setClientError(null);
+                  }}
+                  className={`reason-card ${visitReason === opt.value ? "selected" : ""}`}
+                >
+                  <div className="radio-dot" />
+                  <span className="reason-card-label">{opt.label}</span>
+                </button>
+              ))}
             </div>
             {state.errors?.visitReason && (
               <span className="form-error" style={{ marginTop: "0.25rem" }}>
@@ -337,13 +419,16 @@ export default function VisitorForm() {
                         className={`decision-checkbox ${checked ? "checked" : ""}`}
                         aria-hidden="true"
                       />
-                      <span className="decision-label">{opt.label}</span>
+                      <span className="decision-label">
+                        <strong>{opt.numberPrefix} — </strong> {opt.label}
+                      </span>
                     </label>
                   );
                 })}
               </div>
             )}
           </div>
+
 
           {/* Mensagem de Erro (visível logo acima do botão Enviar) */}
           {(clientError || (!state.success && state.message)) && (
