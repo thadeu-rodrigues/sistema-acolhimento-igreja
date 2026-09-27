@@ -18,8 +18,9 @@ export async function sendTelegramMessage(
   text: string,
   replyMarkup?: object
 ): Promise<void> {
-  if (!BOT_TOKEN) {
-    console.warn("[telegram] TELEGRAM_BOT_TOKEN não configurado.");
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    console.warn("[telegram] TELEGRAM_BOT_TOKEN não configurado no ambiente.");
     return;
   }
 
@@ -30,15 +31,21 @@ export async function sendTelegramMessage(
   };
   if (replyMarkup) body.reply_markup = replyMarkup;
 
-  const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("[telegram] sendMessage error:", err);
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[telegram] sendMessage error:", err);
+    } else {
+      console.log(`[telegram] Mensagem enviada com sucesso para chatId: ${chatId}`);
+    }
+  } catch (err) {
+    console.error("[telegram] Erro de conexão ao enviar mensagem:", err);
   }
 }
 
@@ -56,9 +63,12 @@ export async function notifyLeaders(
   groupLeaders: { user: { telegramChatId?: string | null; name: string } }[]
 ): Promise<void> {
   const leadersWithTelegram = groupLeaders.filter((gl) => gl.user.telegramChatId);
+  console.log(`[telegram] notifyLeaders: ${groupLeaders.length} líderes no grupo, ${leadersWithTelegram.length} com Telegram vinculado.`);
+
   if (leadersWithTelegram.length === 0) return;
 
   const reasonLabel = REASON_LABELS[visitor.visitReason] ?? visitor.visitReason;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://ictaubate.online").replace(/\/$/, "");
 
   const text =
     `🆕 <b>Novo Contato Recebido!</b>\n\n` +
@@ -69,7 +79,7 @@ export async function notifyLeaders(
     `━━━━━━━━━━━━━━━━━\n` +
     `👇 <b>Dar retorno agora:</b>`;
 
-  const contactUrl = `${APP_URL}/api/contact/${visitor.id}`;
+  const contactUrl = `${appUrl}/api/contact/${visitor.id}`;
 
   const replyMarkup = {
     inline_keyboard: [[
