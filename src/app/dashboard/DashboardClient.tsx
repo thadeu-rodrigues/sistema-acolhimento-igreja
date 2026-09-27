@@ -467,30 +467,32 @@ export default function DashboardClient({
     <div className="dash-page-container">
 
       {/* ── Topbar Responsiva (Sem Overflow) ── */}
+      {/* ── Topbar Responsiva (Sem Overflow) ── */}
       <header className="dash-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
           <img
             src="/logo-ic.png"
             alt="Logo IC Taubaté"
             style={{
-              width: "2.1rem",
-              height: "2.1rem",
+              width: "1.9rem",
+              height: "1.9rem",
               borderRadius: "50%",
               objectFit: "contain",
               display: "block",
               border: "1.5px solid rgba(255,255,255,0.8)",
             }}
           />
-          <div style={{ fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.02em" }}>
+          <div style={{ fontWeight: 800, fontSize: "0.9rem", letterSpacing: "-0.02em" }}>
             ACOLHIMENTO<span style={{ color: "#E8351A" }}>*</span>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0 }}>
-          {/* Botão Acesso Rápido QR Code */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+          {/* Botão Acesso Rápido QR Code (Oculto em mobile, visível desktop) */}
           <button
             id="header-qrcode-btn"
             type="button"
+            className="dash-hide-mobile"
             onClick={() => setShowQrModal(true)}
             style={{
               background: "rgba(232,53,26,0.18)",
@@ -501,7 +503,6 @@ export default function DashboardClient({
               fontSize: "0.72rem",
               fontWeight: 700,
               cursor: "pointer",
-              display: "flex",
               alignItems: "center",
               gap: "0.3rem",
               transition: "all 0.15s ease",
@@ -516,15 +517,15 @@ export default function DashboardClient({
           <div style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.45rem",
+            gap: "0.35rem",
             background: "rgba(255,255,255,0.08)",
-            padding: "0.2rem 0.55rem 0.2rem 0.35rem",
+            padding: "0.2rem 0.45rem 0.2rem 0.3rem",
             borderRadius: "999px",
             border: "1px solid rgba(255,255,255,0.15)",
           }}>
             <div style={{
-              width: "24px",
-              height: "24px",
+              width: "22px",
+              height: "22px",
               borderRadius: "50%",
               background: currentRoleBadge.bg,
               color: currentRoleBadge.color,
@@ -532,25 +533,31 @@ export default function DashboardClient({
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 800,
-              fontSize: "0.72rem",
+              fontSize: "0.68rem",
+              flexShrink: 0,
             }}>
               {(session?.user?.name || session?.user?.email || "U").charAt(0).toUpperCase()}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#ffffff", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+            {/* Nome e subtítulo (Ocultos em telas pequenas/mobile para não estourar largura) */}
+            <div className="dash-hide-mobile" style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#ffffff", maxWidth: "130px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {session?.user?.name || session?.user?.email}
               </span>
-              <span style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.6)", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.6)", maxWidth: "130px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {role === "LEADER" ? `Rede ${groups.map((g) => g.name).join(", ") || "Líder"}` : session?.user?.email}
               </span>
             </div>
+
+            {/* Badge de Cargo */}
             <span style={{
               background: currentRoleBadge.bg,
               color: currentRoleBadge.color,
               borderRadius: "999px",
-              padding: "1px 6px",
-              fontSize: "0.62rem",
+              padding: "1px 5px",
+              fontSize: "0.6rem",
               fontWeight: 700,
+              whiteSpace: "nowrap",
             }}>
               {currentRoleBadge.label}
             </span>
@@ -564,10 +571,12 @@ export default function DashboardClient({
               border: "1px solid rgba(255,255,255,0.2)",
               color: "rgba(255,255,255,0.9)",
               borderRadius: "6px",
-              padding: "0.25rem 0.6rem",
-              fontSize: "0.75rem",
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.72rem",
               fontWeight: 500,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             Sair
