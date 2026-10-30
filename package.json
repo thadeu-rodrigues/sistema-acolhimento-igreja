@@ -1,6 +1,7 @@
 {
   "name": "ictaubate",
   "version": "0.1.0",
+  "author": "Thadeu Rodrigues (https://www.linkedin.com/in/thadeu-rodrigues-46b055369/)",
   "private": true,
   "scripts": {
     "dev": "next dev",

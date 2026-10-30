@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   title: "Bem-vindo | Igreja da Cidade Taubaté",
   description:
     "Que alegria ter você conosco! Uma igreja família para pertencer. Preencha seus dados para receber nosso contato.",
+  authors: [{ name: "Thadeu Rodrigues", url: "https://www.linkedin.com/in/thadeu-rodrigues-46b055369/" }],
+  creator: "Thadeu Rodrigues (https://www.linkedin.com/in/thadeu-rodrigues-46b055369/)",
   icons: {
     icon: "/logo-ic.png",
     apple: "/logo-ic.png",

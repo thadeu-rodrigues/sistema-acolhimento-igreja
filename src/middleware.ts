@@ -1,6 +1,3 @@
-// src/middleware.ts
-// Protege /dashboard — redireciona para /login se não autenticado
-
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 

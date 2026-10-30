@@ -1,8 +1,3 @@
-// ============================================================
-// groupRouter.ts — Algoritmo de Roteamento de Visitantes
-// Igreja da Cidade Taubaté
-// ============================================================
-
 export type MaritalStatus =
   | "SOLTEIRO"
   | "CASADO"

@@ -156,7 +156,6 @@ export default function ObrigadoClient() {
           Siga @ic.taubate no Instagram ↗
         </a>
 
-        {/* Voltar ao início */}
         <Link
           href="/"
           className="btn-primary"

@@ -32,7 +32,6 @@ export default function LoginPage() {
 
   return (
     <main>
-      {/* Hero preto */}
       <header className="hero-section" style={{ minHeight: "auto", paddingBottom: "2rem" }}>
         <div className="ic-logo-wrap">
           <img src="/logo-ic.png" alt="Igreja da Cidade Taubaté" className="ic-logo-img" />
@@ -48,7 +47,6 @@ export default function LoginPage() {
         </p>
       </header>
 
-      {/* Formulário de login */}
       <section className="form-section">
         <form onSubmit={handleSubmit} noValidate>
           {error && (

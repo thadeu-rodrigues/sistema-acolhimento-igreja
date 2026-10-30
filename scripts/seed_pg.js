@@ -1,13 +1,9 @@
-// scripts/seed_pg.js
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Iniciando seed no banco PostgreSQL ictaubate_db...");
-
-  // 1. Grupos
   const groups = [
     {
       name: "VOLTZ",
@@ -42,10 +38,9 @@ async function main() {
       create: g,
     });
   }
-  console.log("✅ Grupos criados/atualizados:", groups.map((g) => g.name).join(", "));
 
-  // Senha padrão solicitada
-  const defaultPassword = await bcrypt.hash("adminictaubate123@", 12);
+  const initialPassword = process.env.INITIAL_SEED_PASSWORD || "adminictaubate123@";
+  const defaultPassword = await bcrypt.hash(initialPassword, 12);
 
   // 2. Admin
   await prisma.user.upsert({

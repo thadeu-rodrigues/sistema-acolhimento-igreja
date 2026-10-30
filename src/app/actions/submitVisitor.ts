@@ -1,11 +1,9 @@
-// src/app/actions/submitVisitor.ts
 "use server";
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { resolveGroup } from "@/lib/routing/groupRouter";
 
-// ── Zod Schema — Validação do formulário ──────────────────
 const visitorSchema = z.object({
   fullName: z.string().min(3, "Nome deve ter ao menos 3 caracteres"),
   phone: z
