@@ -1,5 +1,9 @@
 # ⛪ Sistema de Acolhimento e Gestão de Visitantes
 
+<p align="center">
+  <img src="public/social-preview.png" alt="Sistema de Acolhimento - Banner" width="100%" />
+</p>
+
 > Plataforma moderna para recepção, triagem inteligente e acolhimento de novos visitantes em comunidades de fé.  
 > Desenvolvida originalmente para a **Igreja da Cidade Taubaté**, com arquitetura modular facilmente adaptável a **qualquer igreja ou ministério**.
 
@@ -121,8 +125,8 @@ Com uma interface mobile-first de alto desempenho, o visitante escaneia um QR Co
 
 ### 2. Clonar o Repositório
 ```bash
-git clone https://github.com/seu-usuario/ictaubate.git
-cd ictaubate
+git clone https://github.com/thadeu-rodrigues/sistema-acolhimento-igreja.git
+cd sistema-acolhimento-igreja
 ```
 
 ### 3. Instalar Dependências
